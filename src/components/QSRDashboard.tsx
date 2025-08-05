@@ -185,7 +185,7 @@ const QSRDashboard: React.FC = () => {
         <div className="flex items-center justify-between mb-8">
           <div>
             <h1 className="text-4xl font-bold tracking-tight dashboard-gradient text-transparent bg-clip-text">
-              QSR Analytics Dashboard
+              Analytics Dashboard
             </h1>
             <p className="text-muted-foreground mt-2">
               Analyzing {summaryStats?.totalReviews.toLocaleString()} reviews
@@ -314,3 +314,4 @@ const QSRDashboard: React.FC = () => {
 };
 
 export default QSRDashboard;
+
