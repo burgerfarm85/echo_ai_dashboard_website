@@ -210,7 +210,7 @@ export const CityAnalysis: React.FC<CityAnalysisProps> = ({ data }) => {
                           variant={stat.satisfactionRate >= 80 ? 'default' : stat.satisfactionRate >= 60 ? 'secondary' : 'destructive'}
                           className="text-xs"
                         >
-                          {stat.satisfactionRate.toFixed(1)}% satisfaction
+                          {stat.satisfactionRate.toFixed(1)}% Disappointment Level
                         </Badge>
                       </div>
                       
@@ -395,4 +395,5 @@ export const CityAnalysis: React.FC<CityAnalysisProps> = ({ data }) => {
       )}
     </div>
   );
+
 };
