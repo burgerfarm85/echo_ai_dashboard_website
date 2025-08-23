@@ -6,6 +6,9 @@ import { Upload, FileSpreadsheet, Loader2, CheckCircle, AlertCircle, Download } 
 import { uploadFile, checkStatus, getDownloadUrl, type StatusResponse } from '../../services/apiService';
 import { useToast } from '../ui/use-toast';
 import * as XLSX from 'xlsx';
+import { ProcessingLottie } from '../animations/ProcessingLottie';
+import { UploadLottie } from '../animations/UploadLottie';
+import burgerFarmLogo from '../../assets/burger-farm-logo.png';
 
 interface UploadedFile {
   id: string;
@@ -163,14 +166,21 @@ export const FileUpload: React.FC<FileUploadProps> = ({ onFileUpload, loading, s
       const worksheet = workbook.Sheets[workbook.SheetNames[0]];
       const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
       
-      // Process data
+      // Process data with new column structure
       const headers = jsonData[0] as string[];
       const processedData = (jsonData.slice(1) as any[][]).map(row => ({
-        City: row[headers.indexOf('City')] || '',
-        Reviews: row[headers.indexOf('Reviews')] || '',
-        LLM_Cluster_Label: row[headers.indexOf('LLM_Cluster_Label')] || '',
-        LLM_Meta_Label: row[headers.indexOf('LLM_Meta_Label')] || ''
-      })).filter(item => item.City && item.Reviews);
+        'S.No': row[headers.indexOf('S.No')] || 0,
+        'Store Name': row[headers.indexOf('Store Name')] || '',
+        'Region': row[headers.indexOf('Region')] || '',
+        'Date': row[headers.indexOf('Date')] || '',
+        'Remark': row[headers.indexOf('Remark')] || '',
+        'Subject': row[headers.indexOf('Subject')] || '',
+        'Aggregator': row[headers.indexOf('Aggregator')] || '',
+        'Month': row[headers.indexOf('Month')] || '',
+        'Area Manger Name': row[headers.indexOf('Area Manger Name')] || '',
+        'LLM_Cluster_Label': row[headers.indexOf('LLM_Cluster_Label')] || '',
+        'LLM_Meta_Label': row[headers.indexOf('LLM_Meta_Label')] || ''
+      })).filter(item => item['Store Name'] && item['Remark'] && item['LLM_Cluster_Label']);
 
       onFileUpload(processedData);
       
@@ -195,40 +205,68 @@ export const FileUpload: React.FC<FileUploadProps> = ({ onFileUpload, loading, s
 
   return (
     <div className="space-y-6">
+      {/* Hero Section with Branding */}
+      <div className="text-center py-8 animate-fade-in">
+        <div className="flex items-center justify-center gap-4 mb-6">
+          <img src={burgerFarmLogo} alt="Burger Farm Logo" className="h-16 w-16 animate-float" />
+          <div>
+            <h1 className="text-4xl font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
+              Burger Farm EchoAI
+            </h1>
+            <p className="text-lg text-muted-foreground mt-2">
+              Advanced Customer Insights Analytics Platform
+            </p>
+          </div>
+        </div>
+      </div>
+
       {/* Upload Section */}
-      <Card className="glass-effect border-0 shadow-elegant animate-scale-in">
-        <CardContent className="p-8">
+      <Card className="glass-effect border-0 shadow-elegant animate-scale-in overflow-hidden">
+        <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-transparent to-accent/5"></div>
+        <CardContent className="p-8 relative">
           <div
-            className="border-2 border-dashed border-primary/20 rounded-lg p-12 text-center hover:border-primary/40 transition-all duration-300 cursor-pointer"
+            className="border-2 border-dashed border-primary/30 rounded-2xl p-12 text-center hover:border-primary/60 transition-all duration-500 cursor-pointer bg-gradient-to-br from-background/80 to-background/40 backdrop-blur-sm hover:shadow-2xl"
             onDrop={handleDrop}
             onDragOver={handleDragOver}
             onClick={() => fileInputRef.current?.click()}
           >
             {uploading ? (
-              <div className="flex flex-col items-center gap-4">
-                <Loader2 className="h-16 w-16 text-primary animate-spin" />
-                <div>
-                  <h3 className="text-xl font-semibold mb-2">Uploading your file...</h3>
-                  <p className="text-muted-foreground">This will be processed automatically</p>
+              <div className="flex flex-col items-center gap-6">
+                <div className="relative">
+                  <ProcessingLottie size={80} className="animate-pulse-soft" />
+                  <div className="absolute -inset-4 bg-primary/20 rounded-full blur-xl animate-pulse"></div>
+                </div>
+                <div className="space-y-2">
+                  <h3 className="text-2xl font-bold text-primary">Uploading your file...</h3>
+                  <p className="text-muted-foreground text-lg">EchoAI is preparing your data for analysis</p>
+                  <div className="w-64 h-2 bg-muted rounded-full mx-auto overflow-hidden">
+                    <div className="h-full bg-gradient-to-r from-primary to-accent rounded-full animate-pulse"></div>
+                  </div>
                 </div>
               </div>
             ) : (
-              <div className="flex flex-col items-center gap-4">
-                <div className="p-4 rounded-full dashboard-gradient">
-                  <Upload className="h-12 w-12 text-white" />
+              <div className="flex flex-col items-center gap-6">
+                <div className="relative group">
+                  <div className="p-6 rounded-full dashboard-gradient shadow-elegant group-hover:scale-110 transition-transform duration-300">
+                    <UploadLottie size={48} />
+                  </div>
+                  <div className="absolute -inset-2 bg-primary/20 rounded-full blur-xl opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
                 </div>
-                <div>
-                  <h3 className="text-xl font-semibold mb-2">Upload & Process Excel File</h3>
-                  <p className="text-muted-foreground mb-4">
-                    Drop your .xlsx file here or click to browse. File will be automatically processed with AI.
+                <div className="space-y-4">
+                  <h3 className="text-2xl font-bold text-foreground">Upload & Analyze Customer Feedback</h3>
+                  <p className="text-muted-foreground text-lg max-w-lg mx-auto">
+                    Drop your Excel file here or click to browse. Our AI will automatically process and cluster your customer feedback for deep insights.
                   </p>
-                  <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground">
-                    <FileSpreadsheet className="h-4 w-4" />
-                    Supports .xlsx and .xls formats (Max 100MB)
+                  <div className="flex items-center justify-center gap-3 text-muted-foreground bg-muted/30 rounded-lg p-3 max-w-md mx-auto">
+                    <FileSpreadsheet className="h-5 w-5 text-primary" />
+                    <span className="font-medium">Supports .xlsx and .xls formats (Max 100MB)</span>
                   </div>
                 </div>
-                <Button className="mt-4 dashboard-gradient border-0" disabled={uploading}>
-                  {uploading ? 'Uploading...' : 'Select File'}
+                <Button 
+                  className="mt-6 dashboard-gradient border-0 px-8 py-3 text-lg font-semibold hover:scale-105 transition-transform duration-200 shadow-elegant" 
+                  disabled={uploading}
+                >
+                  {uploading ? 'Processing...' : 'Select Your Data File'}
                 </Button>
               </div>
             )}
@@ -245,58 +283,84 @@ export const FileUpload: React.FC<FileUploadProps> = ({ onFileUpload, loading, s
 
       {/* Processing Status */}
       {uploadedFiles.length > 0 && (
-        <Card className="glass-effect border-0 shadow-card">
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-semibold">Processing Status</h3>
-              <Button variant="outline" size="sm" onClick={checkProcessingStatus}>
+        <Card className="glass-effect border-0 shadow-card animate-slide-up overflow-hidden">
+          <div className="absolute inset-0 bg-gradient-to-br from-accent/5 via-transparent to-primary/5"></div>
+          <CardContent className="p-6 relative">
+            <div className="flex items-center justify-between mb-6">
+              <div className="flex items-center gap-3">
+                <div className="p-2 dashboard-gradient rounded-lg">
+                  <ProcessingLottie size={24} />
+                </div>
+                <h3 className="text-xl font-bold">EchoAI Processing Center</h3>
+              </div>
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={checkProcessingStatus}
+                className="hover:scale-105 transition-transform duration-200"
+              >
+                <ProcessingLottie size={16} className="mr-2" />
                 Refresh Status
               </Button>
             </div>
-            <div className="space-y-3">
-              {uploadedFiles.slice(0, 5).map((file) => (
+            <div className="space-y-4">
+              {uploadedFiles.slice(0, 5).map((file, index) => (
                 <div
                   key={file.id}
-                  className={`p-4 rounded-lg border transition-all duration-200 ${
-                    file.status === 'completed' ? 'border-accent/50 bg-accent/5' :
-                    file.status === 'failed' ? 'border-destructive/50 bg-destructive/5' :
-                    'border-border bg-background'
+                  className={`p-5 rounded-xl border-2 transition-all duration-300 hover:shadow-lg ${
+                    file.status === 'completed' ? 'border-accent/50 bg-gradient-to-r from-accent/10 to-accent/5' :
+                    file.status === 'failed' ? 'border-destructive/50 bg-gradient-to-r from-destructive/10 to-destructive/5' :
+                    'border-primary/30 bg-gradient-to-r from-primary/10 to-primary/5'
                   }`}
+                  style={{ animationDelay: `${index * 100}ms` }}
                 >
                   <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3 flex-1">
-                      <div className={`p-2 rounded-lg ${
-                        file.status === 'completed' ? 'bg-accent text-white' :
-                        file.status === 'failed' ? 'bg-destructive text-white' :
-                        'bg-warning text-white'
+                    <div className="flex items-center gap-4 flex-1">
+                      <div className={`p-3 rounded-xl shadow-lg ${
+                        file.status === 'completed' ? 'success-gradient' :
+                        file.status === 'failed' ? 'danger-gradient' :
+                        'warning-gradient'
                       }`}>
-                        {file.status === 'completed' ? <CheckCircle className="h-4 w-4" /> :
-                         file.status === 'failed' ? <AlertCircle className="h-4 w-4" /> :
-                         <Loader2 className="h-4 w-4 animate-spin" />}
+                        {file.status === 'completed' ? (
+                          <CheckCircle className="h-5 w-5 text-white" />
+                        ) : file.status === 'failed' ? (
+                          <AlertCircle className="h-5 w-5 text-white" />
+                        ) : (
+                          <ProcessingLottie size={20} />
+                        )}
                       </div>
                       <div className="flex-1 min-w-0">
-                        <h4 className="font-medium truncate">{file.originalName}</h4>
-                        <div className="flex items-center gap-2 text-sm text-muted-foreground mt-1">
-                          <span>{new Date(file.uploadTime).toLocaleString()}</span>
-                          <Badge variant={
-                            file.status === 'completed' ? 'default' :
-                            file.status === 'failed' ? 'destructive' :
-                            'secondary'
-                          } className="text-xs">
-                            {file.status.charAt(0).toUpperCase() + file.status.slice(1)}
+                        <h4 className="font-semibold text-lg truncate">{file.originalName}</h4>
+                        <div className="flex items-center gap-3 text-sm text-muted-foreground mt-2">
+                          <span className="font-medium">{new Date(file.uploadTime).toLocaleString()}</span>
+                          <Badge 
+                            variant={
+                              file.status === 'completed' ? 'default' :
+                              file.status === 'failed' ? 'destructive' :
+                              'secondary'
+                            } 
+                            className="text-xs px-3 py-1 font-semibold"
+                          >
+                            {file.status === 'processing' ? 'AI Analyzing...' : 
+                             file.status === 'completed' ? 'Ready for Insights' :
+                             'Processing Failed'}
                           </Badge>
                         </div>
+                        {file.status === 'processing' && (
+                          <div className="w-full bg-muted rounded-full h-2 mt-3 overflow-hidden">
+                            <div className="h-full bg-gradient-to-r from-primary to-accent rounded-full animate-pulse"></div>
+                          </div>
+                        )}
                       </div>
                     </div>
                     {file.status === 'completed' && file.processedFileName && (
                       <Button
                         onClick={() => handleLoadProcessedFile(file)}
                         disabled={loading}
-                        className="gap-2 dashboard-gradient"
-                        size="sm"
+                        className="gap-2 dashboard-gradient px-6 py-3 font-semibold hover:scale-105 transition-transform duration-200 shadow-lg"
                       >
                         <Download className="h-4 w-4" />
-                        Load for Analysis
+                        Analyze Insights
                       </Button>
                     )}
                   </div>

@@ -1,370 +1,513 @@
-import React, { useState } from 'react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card';
+import React, { useState, useMemo } from 'react';
+import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
-import { Input } from '../ui/input';
-import { Badge } from '../ui/badge';
 import { Button } from '../ui/button';
-import { Search, Filter, FileText, MapPin, Tag, Eye, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Badge } from '../ui/badge';
+import { Input } from '../ui/input';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../ui/table';
 import { ReviewData } from '../QSRDashboard';
+import { Search, Filter, X, Star, Calendar, MapPin, Building, User, Tag } from 'lucide-react';
 
 interface DetailedReviewsProps {
   data: ReviewData[];
+  summaryStats: any;
 }
 
-export const DetailedReviews: React.FC<DetailedReviewsProps> = ({ data }) => {
-  const [filterCity, setFilterCity] = useState<string>('all');
-  const [filterMetaCluster, setFilterMetaCluster] = useState<string>('all');
-  const [filterLLMCluster, setFilterLLMCluster] = useState<string>('all');
-  const [searchTerm, setSearchTerm] = useState('');
+type PeriodType = 'daily' | 'weekly' | 'monthly';
+type SortField = 'date' | 'region' | 'store' | 'meta-cluster' | 'subject';
+type SortOrder = 'asc' | 'desc';
+
+export const DetailedReviews: React.FC<DetailedReviewsProps> = ({ data, summaryStats }) => {
+  const [period, setPeriod] = useState<PeriodType>('monthly');
+  const [selectedRegion, setSelectedRegion] = useState<string>('all');
+  const [selectedAreaManager, setSelectedAreaManager] = useState<string>('all');
+  const [selectedStore, setSelectedStore] = useState<string>('all');
+  const [selectedAggregator, setSelectedAggregator] = useState<string>('all');
+  const [selectedMetaCluster, setSelectedMetaCluster] = useState<string>('all');
+  const [selectedSubject, setSelectedSubject] = useState<string>('all');
+  const [searchTerm, setSearchTerm] = useState<string>('');
+  const [sortField, setSortField] = useState<SortField>('date');
+  const [sortOrder, setSortOrder] = useState<SortOrder>('desc');
   const [currentPage, setCurrentPage] = useState(1);
-  const [selectedReview, setSelectedReview] = useState<ReviewData | null>(null);
-  
-  const itemsPerPage = 20;
+  const [rowsPerPage, setRowsPerPage] = useState(25);
 
-  // Get unique values for filters
-  const cities = ['all', ...Array.from(new Set(data.map(d => d.City).filter(city => city && city.trim() !== ''))).sort()];
-  const metaClusters = ['all', ...Array.from(new Set(data.map(d => d.LLM_Meta_Label).filter(meta => meta && meta.trim() !== ''))).sort()];
-  const llmClusters = ['all', ...Array.from(new Set(data.map(d => d.LLM_Cluster_Label).filter(cluster => cluster && cluster.trim() !== ''))).sort()];
+  // Cascading filter options - only show options that have data for current selection
+  const filterOptions = useMemo(() => {
+    // Apply currently selected filters to get base filtered data
+    let filteredData = data.filter(item => {
+      if (selectedRegion !== 'all' && item.Region !== selectedRegion) return false;
+      if (selectedAreaManager !== 'all' && item['Area Manger Name'] !== selectedAreaManager) return false;
+      if (selectedStore !== 'all' && item['Store Name'] !== selectedStore) return false;
+      if (selectedAggregator !== 'all' && item.Aggregator !== selectedAggregator) return false;
+      if (selectedMetaCluster !== 'all' && item.LLM_Meta_Label !== selectedMetaCluster) return false;
+      if (selectedSubject !== 'all' && item.Subject !== selectedSubject) return false;
+      return true;
+    });
 
-  // Filter data
-  const filteredData = React.useMemo(() => {
-    let filtered = data;
+    // Extract available options from filtered data
+    const regions = [...new Set(data.map(d => d.Region))].filter(Boolean).sort();
+    const areaManagers = [...new Set(filteredData.filter(d => selectedRegion === 'all' || d.Region === selectedRegion).map(d => d['Area Manger Name']))].filter(Boolean).sort();
+    const stores = [...new Set(filteredData.filter(d => 
+      (selectedRegion === 'all' || d.Region === selectedRegion) &&
+      (selectedAreaManager === 'all' || d['Area Manger Name'] === selectedAreaManager)
+    ).map(d => d['Store Name']))].filter(Boolean).sort();
+    const aggregators = [...new Set(filteredData.filter(d =>
+      (selectedRegion === 'all' || d.Region === selectedRegion) &&
+      (selectedAreaManager === 'all' || d['Area Manger Name'] === selectedAreaManager) &&
+      (selectedStore === 'all' || d['Store Name'] === selectedStore)
+    ).map(d => d.Aggregator))].filter(Boolean).sort();
+    const metaClusters = [...new Set(filteredData.filter(d =>
+      (selectedRegion === 'all' || d.Region === selectedRegion) &&
+      (selectedAreaManager === 'all' || d['Area Manger Name'] === selectedAreaManager) &&
+      (selectedStore === 'all' || d['Store Name'] === selectedStore) &&
+      (selectedAggregator === 'all' || d.Aggregator === selectedAggregator)
+    ).map(d => d.LLM_Meta_Label))].filter(Boolean).sort();
+    const subjects = [...new Set(filteredData.filter(d =>
+      (selectedRegion === 'all' || d.Region === selectedRegion) &&
+      (selectedAreaManager === 'all' || d['Area Manger Name'] === selectedAreaManager) &&
+      (selectedStore === 'all' || d['Store Name'] === selectedStore) &&
+      (selectedAggregator === 'all' || d.Aggregator === selectedAggregator) &&
+      (selectedMetaCluster === 'all' || d.LLM_Meta_Label === selectedMetaCluster)
+    ).map(d => d.Subject))].filter(Boolean).sort();
 
-    if (filterCity !== 'all') {
-      filtered = filtered.filter(d => d.City === filterCity);
-    }
+    return { regions, areaManagers, stores, aggregators, metaClusters, subjects };
+  }, [data, selectedRegion, selectedAreaManager, selectedStore, selectedAggregator, selectedMetaCluster, selectedSubject]);
 
-    if (filterMetaCluster !== 'all') {
-      filtered = filtered.filter(d => d.LLM_Meta_Label === filterMetaCluster);
-    }
+  // Process and filter data
+  const processedData = useMemo(() => {
+    let filtered = data
+      .map(item => ({
+        ...item,
+        parsedDate: (() => {
+          const [day, month, year] = item.Date?.split('/') || [];
+          if (!day || !month || !year) return null;
+          const fullYear = year.length === 2 ? (parseInt(year) < 50 ? 2000 + parseInt(year) : 1900 + parseInt(year)) : parseInt(year);
+          return new Date(fullYear, parseInt(month) - 1, parseInt(day));
+        })()
+      }))
+      .filter(item => {
+        if (!item.parsedDate) return false;
+        if (selectedRegion !== 'all' && item.Region !== selectedRegion) return false;
+        if (selectedAreaManager !== 'all' && item['Area Manger Name'] !== selectedAreaManager) return false;
+        if (selectedStore !== 'all' && item['Store Name'] !== selectedStore) return false;
+        if (selectedAggregator !== 'all' && item.Aggregator !== selectedAggregator) return false;
+        if (selectedMetaCluster !== 'all' && item.LLM_Meta_Label !== selectedMetaCluster) return false;
+        if (selectedSubject !== 'all' && item.Subject !== selectedSubject) return false;
+        if (searchTerm && !item.Remark?.toLowerCase().includes(searchTerm.toLowerCase())) return false;
+        return true;
+      });
 
-    if (filterLLMCluster !== 'all') {
-      filtered = filtered.filter(d => d.LLM_Cluster_Label === filterLLMCluster);
-    }
+    // Sort data
+    filtered.sort((a, b) => {
+      let aVal: any, bVal: any;
+      
+      switch (sortField) {
+        case 'date':
+          aVal = a.parsedDate?.getTime() || 0;
+          bVal = b.parsedDate?.getTime() || 0;
+          break;
+        case 'region':
+          aVal = a.Region || '';
+          bVal = b.Region || '';
+          break;
+        case 'store':
+          aVal = a['Store Name'] || '';
+          bVal = b['Store Name'] || '';
+          break;
+        case 'meta-cluster':
+          aVal = a.LLM_Meta_Label || '';
+          bVal = b.LLM_Meta_Label || '';
+          break;
+        case 'subject':
+          aVal = a.Subject || '';
+          bVal = b.Subject || '';
+          break;
+        default:
+          return 0;
+      }
 
-    if (searchTerm) {
-      filtered = filtered.filter(d => 
-        d.Reviews.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        d.LLM_Cluster_Label.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        d.LLM_Meta_Label.toLowerCase().includes(searchTerm.toLowerCase())
-      );
-    }
+      if (sortOrder === 'asc') {
+        return aVal < bVal ? -1 : aVal > bVal ? 1 : 0;
+      } else {
+        return aVal > bVal ? -1 : aVal < bVal ? 1 : 0;
+      }
+    });
 
     return filtered;
-  }, [data, filterCity, filterMetaCluster, filterLLMCluster, searchTerm]);
+  }, [data, selectedRegion, selectedAreaManager, selectedStore, selectedAggregator, selectedMetaCluster, selectedSubject, searchTerm, sortField, sortOrder]);
 
-  // Pagination
-  const totalPages = Math.ceil(filteredData.length / itemsPerPage);
-  const paginatedData = filteredData.slice(
-    (currentPage - 1) * itemsPerPage,
-    currentPage * itemsPerPage
-  );
+  // Paginated data
+  const paginatedData = useMemo(() => {
+    const startIndex = (currentPage - 1) * rowsPerPage;
+    return processedData.slice(startIndex, startIndex + rowsPerPage);
+  }, [processedData, currentPage, rowsPerPage]);
 
-  // Reset page when filters change
-  React.useEffect(() => {
-    setCurrentPage(1);
-  }, [filterCity, filterMetaCluster, filterLLMCluster, searchTerm]);
+  const totalPages = Math.ceil(processedData.length / rowsPerPage);
 
-  const clearFilters = () => {
-    setFilterCity('all');
-    setFilterMetaCluster('all');
-    setFilterLLMCluster('all');
+  const clearAllFilters = () => {
+    setSelectedRegion('all');
+    setSelectedAreaManager('all');
+    setSelectedStore('all');
+    setSelectedAggregator('all');
+    setSelectedMetaCluster('all');
+    setSelectedSubject('all');
     setSearchTerm('');
     setCurrentPage(1);
   };
 
-  const getReviewSentiment = (review: string, cluster: string) => {
-    const negativeKeywords = ['missing', 'wrong', 'poor', 'bad', 'terrible', 'awful', 'disappointed', 'error', 'not received', 'damaged', 'cold', 'late'];
-    const positiveKeywords = ['good', 'great', 'excellent', 'amazing', 'perfect', 'delicious', 'fresh', 'hot', 'fast', 'friendly'];
-    
-    const reviewLower = review.toLowerCase();
-    const clusterLower = cluster.toLowerCase();
-    
-    const hasNegative = negativeKeywords.some(keyword => reviewLower.includes(keyword) || clusterLower.includes(keyword));
-    const hasPositive = positiveKeywords.some(keyword => reviewLower.includes(keyword) || clusterLower.includes(keyword));
-    
-    if (hasNegative && !hasPositive) return 'negative';
-    if (hasPositive && !hasNegative) return 'positive';
-    return 'neutral';
+  const handleSort = (field: SortField) => {
+    if (sortField === field) {
+      setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortField(field);
+      setSortOrder('desc');
+    }
+    setCurrentPage(1);
   };
 
   return (
     <div className="space-y-6">
       {/* Filters */}
       <Card className="glass-effect border-0 shadow-card">
-        <CardHeader>
+        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
           <CardTitle className="flex items-center gap-2">
-            <FileText className="h-5 w-5 text-primary" />
-            Review Explorer
+            <Filter className="h-5 w-5" />
+            Review Filters
           </CardTitle>
-          <CardDescription>
-            Browse and analyze individual customer reviews
-          </CardDescription>
+          <Button variant="outline" size="sm" onClick={clearAllFilters} className="gap-2">
+            <X className="h-4 w-4" />
+            Clear All
+          </Button>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
-            <div className="space-y-2">
-              <label className="text-sm font-medium">City</label>
-              <Select value={filterCity} onValueChange={setFilterCity}>
-                <SelectTrigger>
-                  <SelectValue placeholder="All Cities" />
-                </SelectTrigger>
-                <SelectContent>
-                  {cities.map(city => (
-                    <SelectItem key={city} value={city}>
-                      {city === 'all' ? 'All Cities' : city}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Category</label>
-              <Select value={filterMetaCluster} onValueChange={setFilterMetaCluster}>
-                <SelectTrigger>
-                  <SelectValue placeholder="All Categories" />
-                </SelectTrigger>
-                <SelectContent>
-                  {metaClusters.map(meta => (
-                    <SelectItem key={meta} value={meta}>
-                      {meta === 'all' ? 'All Categories' : meta.length > 30 ? meta.substring(0, 30) + '...' : meta}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Issue Type</label>
-              <Select value={filterLLMCluster} onValueChange={setFilterLLMCluster}>
-                <SelectTrigger>
-                  <SelectValue placeholder="All Issues" />
-                </SelectTrigger>
-                <SelectContent>
-                  {llmClusters.map(cluster => (
-                    <SelectItem key={cluster} value={cluster}>
-                      {cluster === 'all' ? 'All Issues' : cluster.length > 30 ? cluster.substring(0, 30) + '...' : cluster}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Search</label>
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input
-                  placeholder="Search reviews..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-10"
-                />
-              </div>
+          {/* Search */}
+          <div className="mb-4">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
+              <Input
+                placeholder="Search in reviews..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="pl-10"
+              />
             </div>
           </div>
 
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <p className="text-sm text-muted-foreground">
-                Showing {paginatedData.length} of {filteredData.length} reviews
-              </p>
-              {(filterCity !== 'all' || filterMetaCluster !== 'all' || filterLLMCluster !== 'all' || searchTerm) && (
-                <Button variant="outline" size="sm" onClick={clearFilters} className="gap-2">
-                  <Filter className="h-4 w-4" />
-                  Clear Filters
-                </Button>
-              )}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-4">
+            <div>
+              <label className="text-sm font-medium mb-2 block">Region</label>
+              <Select value={selectedRegion} onValueChange={setSelectedRegion}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Regions</SelectItem>
+                  {filterOptions.regions.map(region => (
+                    <SelectItem key={region} value={region}>{region}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
 
-            {/* Pagination Controls */}
-            {totalPages > 1 && (
-              <div className="flex items-center gap-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
-                  disabled={currentPage === 1}
-                  className="gap-1"
-                >
-                  <ChevronLeft className="h-4 w-4" />
-                  Previous
-                </Button>
-                <span className="text-sm text-muted-foreground px-3">
-                  Page {currentPage} of {totalPages}
-                </span>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
-                  disabled={currentPage === totalPages}
-                  className="gap-1"
-                >
-                  Next
-                  <ChevronRight className="h-4 w-4" />
-                </Button>
-              </div>
+            <div>
+              <label className="text-sm font-medium mb-2 block">Area Manager</label>
+              <Select value={selectedAreaManager} onValueChange={setSelectedAreaManager}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Managers</SelectItem>
+                  {filterOptions.areaManagers.map(manager => (
+                    <SelectItem key={manager} value={manager}>{manager}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div>
+              <label className="text-sm font-medium mb-2 block">Store</label>
+              <Select value={selectedStore} onValueChange={setSelectedStore}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Stores</SelectItem>
+                  {filterOptions.stores.map(store => (
+                    <SelectItem key={store} value={store}>{store}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div>
+              <label className="text-sm font-medium mb-2 block">Aggregator</label>
+              <Select value={selectedAggregator} onValueChange={setSelectedAggregator}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Aggregators</SelectItem>
+                  {filterOptions.aggregators.map(aggregator => (
+                    <SelectItem key={aggregator} value={aggregator}>{aggregator}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div>
+              <label className="text-sm font-medium mb-2 block">Meta Cluster</label>
+              <Select value={selectedMetaCluster} onValueChange={setSelectedMetaCluster}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Meta Clusters</SelectItem>
+                  {filterOptions.metaClusters.map(cluster => (
+                    <SelectItem key={cluster} value={cluster}>{cluster}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div>
+              <label className="text-sm font-medium mb-2 block">Subject</label>
+              <Select value={selectedSubject} onValueChange={setSelectedSubject}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Subjects</SelectItem>
+                  {filterOptions.subjects.map(subject => (
+                    <SelectItem key={subject} value={subject}>{subject}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          <div className="flex flex-wrap gap-2 mt-4">
+            {selectedRegion !== 'all' && (
+              <Badge variant="secondary" className="gap-1">
+                Region: {selectedRegion}
+                <X className="h-3 w-3 cursor-pointer" onClick={() => setSelectedRegion('all')} />
+              </Badge>
+            )}
+            {selectedAreaManager !== 'all' && (
+              <Badge variant="secondary" className="gap-1">
+                Manager: {selectedAreaManager}
+                <X className="h-3 w-3 cursor-pointer" onClick={() => setSelectedAreaManager('all')} />
+              </Badge>
+            )}
+            {selectedStore !== 'all' && (
+              <Badge variant="secondary" className="gap-1">
+                Store: {selectedStore}
+                <X className="h-3 w-3 cursor-pointer" onClick={() => setSelectedStore('all')} />
+              </Badge>
+            )}
+            {selectedAggregator !== 'all' && (
+              <Badge variant="secondary" className="gap-1">
+                Platform: {selectedAggregator}
+                <X className="h-3 w-3 cursor-pointer" onClick={() => setSelectedAggregator('all')} />
+              </Badge>
+            )}
+            {selectedMetaCluster !== 'all' && (
+              <Badge variant="secondary" className="gap-1">
+                Meta Cluster: {selectedMetaCluster}
+                <X className="h-3 w-3 cursor-pointer" onClick={() => setSelectedMetaCluster('all')} />
+              </Badge>
+            )}
+            {selectedSubject !== 'all' && (
+              <Badge variant="secondary" className="gap-1">
+                Subject: {selectedSubject}
+                <X className="h-3 w-3 cursor-pointer" onClick={() => setSelectedSubject('all')} />
+              </Badge>
+            )}
+            {searchTerm && (
+              <Badge variant="secondary" className="gap-1">
+                Search: "{searchTerm}"
+                <X className="h-3 w-3 cursor-pointer" onClick={() => setSearchTerm('')} />
+              </Badge>
             )}
           </div>
         </CardContent>
       </Card>
 
-      {/* Reviews List */}
-      <div className="space-y-4">
-        {paginatedData.map((review, index) => {
-          const sentiment = getReviewSentiment(review.Reviews, review.LLM_Cluster_Label);
-          
-          return (
-            <Card 
-              key={index} 
-              className="glass-effect border-0 shadow-card hover:shadow-lg transition-all duration-300 cursor-pointer"
-              onClick={() => setSelectedReview(review)}
-            >
-              <CardContent className="p-6">
-                <div className="space-y-4">
-                  {/* Header */}
-                  <div className="flex items-start justify-between">
-                    <div className="flex items-center gap-3">
-                      <div className="p-2 rounded-lg dashboard-gradient">
-                        <MapPin className="h-4 w-4 text-white" />
-                      </div>
-                      <div>
-                        <h4 className="font-semibold">{review.City}</h4>
-                        <p className="text-sm text-muted-foreground">Review #{index + 1 + (currentPage - 1) * itemsPerPage}</p>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Badge 
-                        variant={sentiment === 'positive' ? 'default' : sentiment === 'negative' ? 'destructive' : 'secondary'}
-                        className="text-xs"
-                      >
-                        {sentiment}
+      {/* Summary */}
+      <Card className="glass-effect border-0 shadow-card">
+        <CardContent className="p-4">
+          <div className="flex items-center justify-between">
+            <div className="text-sm text-muted-foreground">
+              Showing {paginatedData.length} of {processedData.length} reviews
+            </div>
+            <div className="flex items-center gap-4">
+              <div className="flex items-center gap-2 text-sm">
+                <span>Rows per page:</span>
+                <Select value={rowsPerPage.toString()} onValueChange={(value) => {
+                  setRowsPerPage(parseInt(value));
+                  setCurrentPage(1);
+                }}>
+                  <SelectTrigger className="w-20">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="10">10</SelectItem>
+                    <SelectItem value="25">25</SelectItem>
+                    <SelectItem value="50">50</SelectItem>
+                    <SelectItem value="100">100</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Reviews Table */}
+      <Card className="glass-effect border-0 shadow-card">
+        <CardContent className="p-0">
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="w-[100px]">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-auto p-0 font-medium"
+                      onClick={() => handleSort('date')}
+                    >
+                      <Calendar className="h-4 w-4 mr-1" />
+                      Date
+                      {sortField === 'date' && (sortOrder === 'asc' ? ' ↑' : ' ↓')}
+                    </Button>
+                  </TableHead>
+                  <TableHead>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-auto p-0 font-medium"
+                      onClick={() => handleSort('region')}
+                    >
+                      <MapPin className="h-4 w-4 mr-1" />
+                      Region
+                      {sortField === 'region' && (sortOrder === 'asc' ? ' ↑' : ' ↓')}
+                    </Button>
+                  </TableHead>
+                  <TableHead>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-auto p-0 font-medium"
+                      onClick={() => handleSort('store')}
+                    >
+                      <Building className="h-4 w-4 mr-1" />
+                      Store
+                      {sortField === 'store' && (sortOrder === 'asc' ? ' ↑' : ' ↓')}
+                    </Button>
+                  </TableHead>
+                  <TableHead>
+                    <User className="h-4 w-4 mr-1 inline" />
+                    Area Manager
+                  </TableHead>
+                  <TableHead>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-auto p-0 font-medium"
+                      onClick={() => handleSort('subject')}
+                    >
+                      <Tag className="h-4 w-4 mr-1" />
+                      Subject
+                      {sortField === 'subject' && (sortOrder === 'asc' ? ' ↑' : ' ↓')}
+                    </Button>
+                  </TableHead>
+                  <TableHead>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-auto p-0 font-medium"
+                      onClick={() => handleSort('meta-cluster')}
+                    >
+                      <Star className="h-4 w-4 mr-1" />
+                      Meta Cluster
+                      {sortField === 'meta-cluster' && (sortOrder === 'asc' ? ' ↑' : ' ↓')}
+                    </Button>
+                  </TableHead>
+                  <TableHead>Aggregator</TableHead>
+                  <TableHead className="min-w-[300px]">Review</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {paginatedData.map((review, index) => (
+                  <TableRow key={`${review['S.No']}-${index}`}>
+                    <TableCell className="font-mono text-xs">
+                      {review.Date}
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant="outline">{review.Region}</Badge>
+                    </TableCell>
+                    <TableCell className="font-medium text-sm">
+                      {review['Store Name']}
+                    </TableCell>
+                    <TableCell className="text-sm">
+                      {review['Area Manger Name']}
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant="secondary" className="text-xs">
+                        {review.Subject}
                       </Badge>
-                      <Button variant="ghost" size="sm" className="gap-1">
-                        <Eye className="h-4 w-4" />
-                        View
-                      </Button>
-                    </div>
-                  </div>
-
-                  {/* Review Text */}
-                  <div className="bg-muted/50 rounded-lg p-4">
-                    <p className="text-sm leading-relaxed">
-                      "{review.Reviews}"
-                    </p>
-                  </div>
-
-                  {/* Clusters */}
-                  <div className="space-y-3">
-                    <div className="flex items-start gap-2">
-                      <Tag className="h-4 w-4 text-muted-foreground mt-0.5" />
-                      <div className="space-y-2 flex-1">
-                        <div>
-                          <span className="text-sm font-medium text-muted-foreground">Issue Type:</span>
-                          <Badge variant="outline" className="ml-2 text-xs">
-                            {review.LLM_Cluster_Label}
-                          </Badge>
-                        </div>
-                        <div>
-                          <span className="text-sm font-medium text-muted-foreground">Category:</span>
-                          <Badge variant="secondary" className="ml-2 text-xs">
-                            {review.LLM_Meta_Label}
-                          </Badge>
-                        </div>
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant="default" className="text-xs">
+                        {review.LLM_Meta_Label}
+                      </Badge>
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant="outline" className="text-xs">
+                        {review.Aggregator}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="max-w-[300px]">
+                      <div className="text-sm line-clamp-3">
+                        {review.Remark}
                       </div>
-                    </div>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          );
-        })}
-      </div>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+        </CardContent>
+      </Card>
 
-      {filteredData.length === 0 && (
-        <Card className="glass-effect border-0 shadow-card">
-          <CardContent className="p-12 text-center">
-            <FileText className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-            <h3 className="text-lg font-semibold mb-2">No Reviews Found</h3>
-            <p className="text-muted-foreground mb-4">
-              Try adjusting your filters or search terms to find reviews.
-            </p>
-            <Button variant="outline" onClick={clearFilters}>
-              Clear All Filters
-            </Button>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Review Detail Modal */}
-      {selectedReview && (
-        <div 
-          className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
-          onClick={() => setSelectedReview(null)}
-        >
-          <Card 
-            className="glass-effect border-0 shadow-2xl max-w-2xl w-full max-h-[80vh] overflow-y-auto"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <FileText className="h-5 w-5 text-primary" />
-                Review Details - {selectedReview.City}
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              <div className="bg-muted/50 rounded-lg p-4">
-                <h4 className="font-medium mb-2">Customer Review:</h4>
-                <p className="text-sm leading-relaxed">"{selectedReview.Reviews}"</p>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <h4 className="font-medium">Location</h4>
-                  <Badge variant="outline" className="w-fit">
-                    <MapPin className="h-3 w-3 mr-1" />
-                    {selectedReview.City}
-                  </Badge>
-                </div>
-
-                <div className="space-y-2">
-                  <h4 className="font-medium">Sentiment</h4>
-                  <Badge 
-                    variant={getReviewSentiment(selectedReview.Reviews, selectedReview.LLM_Cluster_Label) === 'positive' ? 'default' : 
-                            getReviewSentiment(selectedReview.Reviews, selectedReview.LLM_Cluster_Label) === 'negative' ? 'destructive' : 'secondary'}
-                    className="w-fit"
-                  >
-                    {getReviewSentiment(selectedReview.Reviews, selectedReview.LLM_Cluster_Label)}
-                  </Badge>
-                </div>
-              </div>
-
-              <div className="space-y-4">
-                <div>
-                  <h4 className="font-medium mb-2">Specific Issue Type:</h4>
-                  <Badge variant="outline" className="text-sm">
-                    {selectedReview.LLM_Cluster_Label}
-                  </Badge>
-                </div>
-
-                <div>
-                  <h4 className="font-medium mb-2">General Category:</h4>
-                  <Badge variant="secondary" className="text-sm">
-                    {selectedReview.LLM_Meta_Label}
-                  </Badge>
-                </div>
-              </div>
-
-              <div className="flex justify-end">
-                <Button onClick={() => setSelectedReview(null)}>
-                  Close
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-      )}
+      {/* Pagination */}
+      <Card className="glass-effect border-0 shadow-card">
+        <CardContent className="p-4">
+          <div className="flex items-center justify-between">
+            <div className="text-sm text-muted-foreground">
+              Page {currentPage} of {totalPages}
+            </div>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
+                disabled={currentPage === 1}
+              >
+                Previous
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
+                disabled={currentPage === totalPages || totalPages === 0}
+              >
+                Next
+              </Button>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
     </div>
   );
 };
