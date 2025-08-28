@@ -374,7 +374,7 @@ export const RegionsAnalysis: React.FC<RegionsAnalysisProps> = ({ data, summaryS
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <BarChart3 className="h-5 w-5" />
-            Top Performing Stores by Complaints
+            Top Critical Stores by Complaints
           </CardTitle>
         </CardHeader>
         <CardContent>

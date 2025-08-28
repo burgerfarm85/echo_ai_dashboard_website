@@ -47,6 +47,7 @@ export const NewOverviewPanel: React.FC<NewOverviewPanelProps> = ({ data, summar
   const [selectedStore, setSelectedStore] = useState<string>('all');
   const [selectedAggregator, setSelectedAggregator] = useState<string>('all');
   const [viewType, setViewType] = useState<ViewType>('meta-clusters');
+  const [expandedMetaClusters, setExpandedMetaClusters] = useState<Set<string>>(new Set());
 
   // Extract unique values for filters
   // Cascading filter options - only show options that have data for current selection
@@ -565,7 +566,7 @@ export const NewOverviewPanel: React.FC<NewOverviewPanelProps> = ({ data, summar
                   </ResponsiveContainer>
                 </div>
                 <div className="space-y-1">
-                  {cluster.data.slice(0, 3).map((item, idx) => (
+                  {(expandedMetaClusters.has(cluster.metaCluster) ? cluster.data : cluster.data.slice(0, 3)).map((item, idx) => (
                     <div key={idx} className="flex items-center justify-between text-xs">
                       <div className="flex items-center gap-2">
                         <div 
@@ -574,13 +575,34 @@ export const NewOverviewPanel: React.FC<NewOverviewPanelProps> = ({ data, summar
                         />
                         <span className="truncate max-w-[100px]">{item.name}</span>
                       </div>
-                      <span className="text-muted-foreground">{item.value}</span>
+                      <div className="flex items-center gap-2">
+                        <span className="text-muted-foreground">{item.value}</span>
+                        <span className="text-xs text-muted-foreground">
+                          ({((item.value / cluster.total) * 100).toFixed(1)}%)
+                        </span>
+                      </div>
                     </div>
                   ))}
                   {cluster.data.length > 3 && (
-                    <div className="text-xs text-muted-foreground text-center">
-                      +{cluster.data.length - 3} more
-                    </div>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-6 w-full text-xs text-muted-foreground hover:text-primary"
+                      onClick={() => {
+                        const newExpanded = new Set(expandedMetaClusters);
+                        if (expandedMetaClusters.has(cluster.metaCluster)) {
+                          newExpanded.delete(cluster.metaCluster);
+                        } else {
+                          newExpanded.add(cluster.metaCluster);
+                        }
+                        setExpandedMetaClusters(newExpanded);
+                      }}
+                    >
+                      {expandedMetaClusters.has(cluster.metaCluster) 
+                        ? "Show less" 
+                        : `+${cluster.data.length - 3} more`
+                      }
+                    </Button>
                   )}
                 </div>
               </div>
