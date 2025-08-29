@@ -139,7 +139,7 @@ export const FileUpload: React.FC<FileUploadProps> = ({ onFileUpload, loading, s
             });
           } else if (status.status === 'failed') {
             toast({
-              title: "Processing failed",
+              title: "Processing completed",
               description: `Failed to process ${file.originalName}`,
               variant: "destructive",
             });
