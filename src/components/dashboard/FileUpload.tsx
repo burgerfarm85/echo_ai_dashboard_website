@@ -343,7 +343,7 @@ export const FileUpload: React.FC<FileUploadProps> = ({ onFileUpload, loading, s
                           >
                             {file.status === 'processing' ? 'AI Analyzing...' : 
                              file.status === 'completed' ? 'Ready for Insights' :
-                             'Processing Failed'}
+                             'Processing Completed'}
                           </Badge>
                         </div>
                         {file.status === 'processing' && (
